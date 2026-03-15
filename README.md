@@ -46,7 +46,7 @@
 - [Blender](https://www.blender.org/download/) 4.0+ (must be accessible via `blender` CLI command)
 - NumPy
 
-> **Note:** If you just want to test the Blender import without installing FURY v2, the JSON files in `scene_data/` are pre-generated and committed. You can skip Step 1 and run only Step 2.
+> **For reviewers:** The core pipeline is in [`create_fury_scene.py`](scenes/create_fury_scene.py) (geometry extraction) and [`import_to_blender.py`](import_to_blender.py) (Blender recreation). To see the results without running anything, open the `.blend` files in `converted-blend-files/` directly in Blender, or view the side-by-side screenshots above.
 
 ### Steps
 
