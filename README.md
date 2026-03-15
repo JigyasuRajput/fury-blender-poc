@@ -46,15 +46,15 @@
 - [Blender](https://www.blender.org/download/) 4.0+ (must be accessible via `blender` CLI command)
 - NumPy
 
-> **Note:** If you just want to test the Blender import without installing FURY v2, the `scene_data.json` files are pre-generated and committed. You can skip Step 1 and run only Step 2.
+> **Note:** If you just want to test the Blender import without installing FURY v2, the JSON files in `scene_data/` are pre-generated and committed. You can skip Step 1 and run only Step 2.
 
 ### Steps
 
 **Step 1: Create FURY scenes and export geometry**
 ```bash
-python create_fury_scene.py        # Primitives → scene_data.json
-python create_molecular_scene.py   # Caffeine molecule → molecular_scene_data.json
-python create_helix_scene.py       # DNA helix → helix_scene_data.json
+python scenes/create_fury_scene.py        # Primitives
+python scenes/create_molecular_scene.py   # Caffeine molecule
+python scenes/create_helix_scene.py       # DNA helix
 ```
 
 **Step 2: Import into Blender and render**

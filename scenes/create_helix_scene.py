@@ -13,7 +13,7 @@ import numpy as np
 
 import fury
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Color palette
 STRAND_A_COLOR = [0.2, 0.5, 1.0]   # Blue strand
@@ -242,7 +242,7 @@ def main():
     scene, actors = create_scene()
 
     print("Rendering screenshot...")
-    screenshot_path = os.path.join(SCRIPT_DIR, "screenshots", "helix_fury.png")
+    screenshot_path = os.path.join(PROJECT_ROOT, "screenshots", "helix_fury.png")
 
     show_m = fury.window.ShowManager(
         scene=scene, window_type="offscreen", size=(1920, 1080)
@@ -274,7 +274,7 @@ def main():
     print(f"  Camera at {camera_data['position']}, fov={camera_data['fov']}")
 
     scene_export = {"actors": actor_data_list, "camera": camera_data}
-    json_path = os.path.join(SCRIPT_DIR, "helix_scene_data.json")
+    json_path = os.path.join(PROJECT_ROOT, "scene_data", "helix_scene_data.json")
     with open(json_path, "w") as f:
         json.dump(scene_export, f, indent=2)
 

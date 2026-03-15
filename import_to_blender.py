@@ -237,7 +237,7 @@ def main():
         if args_after:
             json_file = args_after[0]
 
-    json_path = os.path.join(SCRIPT_DIR, json_file)
+    json_path = os.path.join(SCRIPT_DIR, "scene_data", json_file)
     print(f"Loading {json_path}...")
 
     if not os.path.exists(json_path):
