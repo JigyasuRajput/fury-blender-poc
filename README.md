@@ -86,4 +86,4 @@ FURY Scene (pygfx)          Export Pipeline           Blender Scene
 ## Author
 
 **Jigyasu Rajput** — GSoC 2025 contributor (Python Software Foundation)
-[GitHub](https://github.com/JigyasuRajput) | Currently contributing to fury-gl/fury (5+ PRs on v2 branch)
+[GitHub](https://github.com/JigyasuRajput) | Currently contributing to fury-gl/fury (5 PRs on v2 branch)
