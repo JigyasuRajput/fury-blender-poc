@@ -78,6 +78,7 @@ def create_mesh_object(actor_data):
     mesh = bpy.data.meshes.new(name)
     mesh.from_pydata(blender_verts, [], faces)
     mesh.update()
+    mesh.validate()
 
     # Create object
     obj = bpy.data.objects.new(name, mesh)
@@ -89,16 +90,34 @@ def create_mesh_object(actor_data):
     obj.location = bpos
     obj.scale = (scale[0], scale[2], scale[1])  # swap Y/Z for scale too
 
+    # Apply per-vertex colors if available
+    vcols = actor_data.get("vertex_colors")
+    has_vcols = vcols is not None and len(vcols) == len(verts)
+
+    if has_vcols:
+        color_attr = mesh.color_attributes.new(name="Color", type="FLOAT_COLOR", domain="POINT")
+        for i, vc in enumerate(vcols):
+            r, g, b = vc[0], vc[1], vc[2]
+            a = vc[3] if len(vc) > 3 else 1.0
+            color_attr.data[i].color = (r, g, b, a)
+
     # Create material
     mat = bpy.data.materials.new(name + "_material")
     mat.use_nodes = True
-    bsdf = mat.node_tree.nodes["Principled BSDF"]
+    nodes = mat.node_tree.nodes
+    links = mat.node_tree.links
+    bsdf = nodes["Principled BSDF"]
 
-    r, g, b = color[0], color[1], color[2]
-    a = color[3] if len(color) > 3 else 1.0
-    bsdf.inputs["Base Color"].default_value = (r, g, b, a)
+    if has_vcols:
+        # Wire vertex colors into the Principled BSDF base color
+        vcol_node = nodes.new(type="ShaderNodeVertexColor")
+        vcol_node.layer_name = "Color"
+        links.new(vcol_node.outputs["Color"], bsdf.inputs["Base Color"])
+    else:
+        r, g, b = color[0], color[1], color[2]
+        a = color[3] if len(color) > 3 else 1.0
+        bsdf.inputs["Base Color"].default_value = (r, g, b, a)
 
-    # Slight specular for visual appeal
     bsdf.inputs["Roughness"].default_value = 0.4
     bsdf.inputs["Metallic"].default_value = 0.05
 
@@ -211,7 +230,14 @@ def configure_render():
 
 
 def main():
-    json_path = os.path.join(SCRIPT_DIR, "scene_data.json")
+    # Accept optional JSON filename via: blender --background --python import_to_blender.py -- myfile.json
+    json_file = "scene_data.json"
+    if "--" in sys.argv:
+        args_after = sys.argv[sys.argv.index("--") + 1:]
+        if args_after:
+            json_file = args_after[0]
+
+    json_path = os.path.join(SCRIPT_DIR, json_file)
     print(f"Loading {json_path}...")
 
     if not os.path.exists(json_path):
@@ -255,15 +281,23 @@ def main():
     # Render settings
     configure_render()
 
+    # Derive short prefix from JSON name (e.g. molecular_scene_data.json -> molecular)
+    base = os.path.splitext(json_file)[0]
+    prefix = base.replace("_scene_data", "").replace("scene_data", "primitives")
+    if not prefix:
+        prefix = "primitives"
+
     # Render
-    render_path = os.path.join(SCRIPT_DIR, "screenshots", "blender_render.png")
+    render_path = os.path.join(SCRIPT_DIR, "screenshots", f"{prefix}_blender.png")
     bpy.context.scene.render.filepath = render_path
     print(f"Rendering to {render_path}...")
     bpy.ops.render.render(write_still=True)
     print(f"  Saved {render_path}")
 
     # Save .blend file
-    blend_path = os.path.join(SCRIPT_DIR, "fury_scene.blend")
+    blend_dir = os.path.join(SCRIPT_DIR, "converted-blend-files")
+    os.makedirs(blend_dir, exist_ok=True)
+    blend_path = os.path.join(blend_dir, f"{prefix}.blend")
     bpy.ops.wm.save_as_mainfile(filepath=blend_path)
     print(f"  Saved {blend_path}")
 

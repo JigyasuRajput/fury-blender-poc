@@ -11,11 +11,6 @@ import sys
 
 import numpy as np
 
-# Allow running from the fury repo checkout if fury isn't installed system-wide
-FURY_REPO = os.path.expanduser("~/Documents/OSS/fury")
-if os.path.isdir(FURY_REPO) and FURY_REPO not in sys.path:
-    sys.path.insert(0, FURY_REPO)
-
 import fury
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -39,6 +34,8 @@ def create_scene():
                 centers=np.array([cfg["center"]], dtype=np.float32),
                 colors=np.array([cfg["color"]], dtype=np.float32),
                 radii=cfg["radius"],
+                # impostor=False creates real mesh geometry instead of
+                # billboard SDFs, which is needed for geometry extraction
                 impostor=False,
             )
             a.name = f"sphere_{i}"
@@ -175,11 +172,12 @@ def extract_actor_data(actor):
 
     # Color — try per-vertex colors first, then material color
     color = [0.8, 0.8, 0.8, 1.0]
+    vertex_colors = None
     try:
         colors_buf = geom.colors
         if colors_buf is not None and colors_buf.data is not None:
             c = colors_buf.data
-            # Average per-vertex colors to get a single representative color
+            vertex_colors = c.tolist()
             avg = c.mean(axis=0).tolist()
             if len(avg) == 3:
                 avg.append(1.0)
@@ -208,7 +206,7 @@ def extract_actor_data(actor):
 
     name = getattr(actor, "name", None) or type(actor).__name__
 
-    return {
+    result = {
         "name": name,
         "type": "mesh",
         "vertices": positions.tolist(),
@@ -217,6 +215,9 @@ def extract_actor_data(actor):
         "position": [round(p, 4) for p in pos],
         "scale": [round(s, 4) for s in scale],
     }
+    if vertex_colors is not None:
+        result["vertex_colors"] = vertex_colors
+    return result
 
 
 def extract_camera_data(show_manager):
@@ -248,7 +249,7 @@ def main():
 
     # Render and capture screenshot
     print("Rendering screenshot...")
-    screenshot_path = os.path.join(SCRIPT_DIR, "screenshots", "fury_render.png")
+    screenshot_path = os.path.join(SCRIPT_DIR, "screenshots", "primitives_fury.png")
 
     show_m = fury.window.ShowManager(
         scene=scene, window_type="offscreen", size=(1920, 1080)

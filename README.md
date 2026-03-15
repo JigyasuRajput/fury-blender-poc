@@ -4,42 +4,70 @@
 
 ## Results
 
-| FURY (real-time rendering) | Blender (Cycles/EEVEE rendering) |
+### Scene 1: Primitives
+
+| FURY | Blender (EEVEE) |
 |---|---|
-| ![FURY render](screenshots/fury_render.png) | ![Blender render](screenshots/blender_render.png) |
+| ![FURY](screenshots/primitives_fury.png) | ![Blender](screenshots/primitives_blender.png) |
+
+### Scene 2: Caffeine Molecule (Ball-and-Stick)
+
+| FURY | Blender (EEVEE) |
+|---|---|
+| ![FURY](screenshots/molecular_fury.png) | ![Blender](screenshots/molecular_blender.png) |
+
+### Scene 3: DNA Double Helix
+
+| FURY | Blender (EEVEE) |
+|---|---|
+| ![FURY](screenshots/helix_fury.png) | ![Blender](screenshots/helix_blender.png) |
 
 ## What this demonstrates
 
-- Extracting geometry (vertices, faces, colors) from FURY v2 (pygfx-based) scene objects
+- Extracting geometry (vertices, faces, per-vertex colors) from FURY v2 (pygfx-based) scene objects
 - Coordinate system transformation (pygfx Y-up → Blender Z-up)
-- Recreating meshes with materials in Blender via the bpy Python API
+- Per-vertex color transfer via Blender's `color_attributes` API
+- Recreating meshes with Principled BSDF materials in Blender via the bpy Python API
 - Camera position and FOV transfer between the two systems
 - Automated rendering pipeline (headless Blender)
+- Scientific visualization use cases: molecular structures, DNA helix
 
 ## How to run
 
 ### Prerequisites
+
 - Python 3.9+
-- [FURY](https://github.com/fury-gl/fury) (v2 branch)
+- [FURY v2](https://github.com/fury-gl/fury/tree/v2) (must be installed from the `v2` branch — `pip install fury` won't work as it installs the stable VTK-based version)
+  ```bash
+  git clone -b v2 https://github.com/fury-gl/fury.git
+  cd fury
+  pip install -e ".[dev]"
+  ```
 - [Blender](https://www.blender.org/download/) 4.0+ (must be accessible via `blender` CLI command)
+- NumPy
+
+> **Note:** If you just want to test the Blender import without installing FURY v2, the `scene_data.json` files are pre-generated and committed. You can skip Step 1 and run only Step 2.
 
 ### Steps
 
-**Step 1: Create the FURY scene and export geometry**
+**Step 1: Create FURY scenes and export geometry**
 ```bash
-python create_fury_scene.py
+python create_fury_scene.py        # Primitives → scene_data.json
+python create_molecular_scene.py   # Caffeine molecule → molecular_scene_data.json
+python create_helix_scene.py       # DNA helix → helix_scene_data.json
 ```
-This creates `scene_data.json` and `screenshots/fury_render.png`.
 
 **Step 2: Import into Blender and render**
 ```bash
-blender --background --python import_to_blender.py
+blender --background --python import_to_blender.py -- scene_data.json
+blender --background --python import_to_blender.py -- molecular_scene_data.json
+blender --background --python import_to_blender.py -- helix_scene_data.json
 ```
-This creates `fury_scene.blend` and `screenshots/blender_render.png`.
+Renders are saved to `screenshots/` and `.blend` files to `converted-blend-files/`.
 
 **Step 3 (optional): Open in Blender GUI**
 ```bash
-blender fury_scene.blend
+blender converted-blend-files/molecular.blend
 ```
 
 ## Architecture
@@ -48,28 +76,29 @@ blender fury_scene.blend
 FURY Scene (pygfx)          Export Pipeline           Blender Scene
 ┌──────────────┐     ┌─────────────────────┐     ┌──────────────────┐
 │ Scene         │     │                     │     │ Scene             │
-│  ├─ Camera    │────▶│  scene_data.json    │────▶│  ├─ Camera        │
-│  ├─ Sphere(s) │     │  (vertices, faces,  │     │  ├─ Mesh + Mat    │
-│  ├─ Cone(s)   │     │   colors, camera,   │     │  ├─ Mesh + Mat    │
-│  ├─ Cylinder  │     │   transforms)       │     │  ├─ Sun Light     │
-│  ├─ Box       │     └─────────────────────┘     │  ├─ Fill Light    │
-│  ├─ Arrow     │                                  │  └─ Rim Light     │
-│  └─ Disk      │                                  └──────────────────┘
-└──────────────┘
+│  ├─ Camera    │────▶│  *_scene_data.json  │────▶│  ├─ Camera        │
+│  ├─ Actors    │     │  (vertices, faces,  │     │  ├─ Mesh + Mat    │
+│  │  (Mesh,    │     │   vertex colors,    │     │  ├─ Mesh + Mat    │
+│  │   Sphere,  │     │   camera, transforms│     │  ├─ Sun Light     │
+│  │   Cylinder,│     │   )                 │     │  ├─ Fill Light    │
+│  │   ...)     │     └─────────────────────┘     │  └─ Rim Light     │
+└──────────────┘                                   └──────────────────┘
 ```
 
 ## How it works
 
-### Geometry extraction (`create_fury_scene.py`)
+### Geometry extraction
 
 FURY v2 actors are pygfx `WorldObject`s (typically `Mesh` subclasses). Each actor exposes:
 - `actor.geometry.positions.data` — Nx3 vertex array (numpy)
 - `actor.geometry.indices.data` — Mx3 face index array
-- `actor.geometry.colors.data` — per-vertex colors
-- `actor.material.color` — base material color
+- `actor.geometry.colors.data` — Nx3 per-vertex RGB colors
+- `actor.material.color` — base material color (fallback)
 - `actor.local.position / .scale` — local transform
 
-The script iterates over all actors, extracts this data, and serializes it to JSON.
+> **Note:** Sphere actors are created with `impostor=False` to generate real mesh geometry instead of billboard impostors (SDFs rendered on flat quads), which cannot be exported as mesh data.
+
+The scripts iterate over all actors, extract this data, and serialize it to JSON including per-vertex color arrays for accurate color reproduction in Blender.
 
 ### Coordinate transform
 
@@ -83,11 +112,12 @@ Conversion: `(x, y, z)_pygfx → (x, z, -y)_blender`
 
 ### Blender import (`import_to_blender.py`)
 
-The Blender script reads `scene_data.json` and for each actor:
-1. Creates a `bpy.data.meshes` from vertices + faces
-2. Assigns a Principled BSDF material with the actor's color
-3. Applies position/scale transforms
-4. Enables smooth shading
+The Blender script reads a `*_scene_data.json` and for each actor:
+1. Creates a `bpy.data.meshes` from vertices + faces (with coordinate transform)
+2. Applies per-vertex colors via `mesh.color_attributes` when available
+3. Wires vertex colors into Principled BSDF via a `ShaderNodeVertexColor` node
+4. Falls back to a flat material color when per-vertex data isn't present
+5. Applies position/scale transforms and smooth shading
 
 It also sets up camera (with Track To constraint), three-point lighting, and renders the result.
 
